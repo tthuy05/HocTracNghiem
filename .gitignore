@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+coverage
+playwright-report
+test-results
+.env
+.env*.local
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+prisma/sqlite/dev.db
+prisma/sqlite/dev.db-journal
