@@ -45,7 +45,7 @@ export function CreateStudySetClient() {
 
     const result = await parseImportedContentAction(formData);
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to analyze the outline.");
+      setError(result.error ?? "Không thể phân tích đề.");
       setQuestions([]);
       setIsAnalyzing(false);
       return;
@@ -61,13 +61,13 @@ export function CreateStudySetClient() {
     setError(null);
 
     if (!title.trim()) {
-      setError("Study set title is required.");
+      setError("Tên bộ đề là bắt buộc.");
       setIsSaving(false);
       return;
     }
 
     if (!questions.length || hasInvalidQuestions) {
-      setError("Fix every invalid question before saving.");
+      setError("Hãy sửa tất cả câu hỏi chưa hợp lệ trước khi lưu.");
       setIsSaving(false);
       return;
     }
@@ -83,7 +83,7 @@ export function CreateStudySetClient() {
     });
 
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to save the study set.");
+      setError(result.error ?? "Không thể lưu bộ đề.");
       setIsSaving(false);
       return;
     }
@@ -117,32 +117,32 @@ export function CreateStudySetClient() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Import outline</CardTitle>
+          <CardTitle>Nhập đề</CardTitle>
         </CardHeader>
         <CardContent>
           <form ref={formRef} action={handleAnalyze} className="space-y-5">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
               <div className="space-y-2">
-                <Label htmlFor="title">Study set title</Label>
+                <Label htmlFor="title">Tên bộ đề</Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Example: Network Administration Final Review"
+                  placeholder="Ví dụ: Ôn tập cuối kỳ Quản trị mạng"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="file">Upload .docx file</Label>
+                <Label htmlFor="file">Tải tệp .docx</Label>
                 <Input id="file" name="file" type="file" accept=".docx" />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="text">Paste outline text</Label>
+              <Label htmlFor="text">Dán nội dung đề</Label>
               <Textarea
                 id="text"
                 name="text"
-                placeholder={`Câu 1: Example question?\nA. First option\nB. Second option\nC. Third option\nD. Fourth option\nĐáp án: B`}
+                placeholder={`Câu 1: Câu hỏi ví dụ?\nA. Lựa chọn thứ nhất\nB. Lựa chọn thứ hai\nC. Lựa chọn thứ ba\nD. Lựa chọn thứ tư\nĐáp án: B`}
               />
             </div>
 
@@ -155,7 +155,7 @@ export function CreateStudySetClient() {
 
             <Button type="submit" size="lg" disabled={isAnalyzing}>
               {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileSearch className="h-5 w-5" />}
-              {isAnalyzing ? "Analyzing..." : "Analyze Outline"}
+              {isAnalyzing ? "Đang phân tích..." : "Phân Tích Đề"}
             </Button>
           </form>
         </CardContent>
@@ -164,34 +164,34 @@ export function CreateStudySetClient() {
       {questions.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-card/75 p-8 text-center">
           <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
-          <h2 className="mt-3 text-lg font-semibold">Preview will appear here</h2>
+          <h2 className="mt-3 text-lg font-semibold">Bản xem trước sẽ hiện ở đây</h2>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            Analyze your outline to edit questions before saving.
+            Phân tích đề để chỉnh sửa câu hỏi trước khi lưu.
           </p>
         </div>
       ) : (
         <section className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
-            <SummaryPill label="Detected" value={questions.length} />
-            <SummaryPill label="Valid" value={validCount} tone="success" />
-            <SummaryPill label="Missing answers" value={missingAnswerCount} tone="warning" />
+            <SummaryPill label="Đã nhận diện" value={questions.length} />
+            <SummaryPill label="Hợp lệ" value={validCount} tone="success" />
+            <SummaryPill label="Thiếu đáp án" value={missingAnswerCount} tone="warning" />
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Parsed questions</h2>
-              <p className="text-sm text-muted-foreground">Edit any field the parser did not read correctly.</p>
+              <h2 className="text-xl font-semibold">Câu hỏi đã phân tích</h2>
+              <p className="text-sm text-muted-foreground">Chỉnh lại các trường nếu hệ thống đọc chưa đúng.</p>
             </div>
             <Button size="lg" onClick={handleSave} disabled={isSaving || hasInvalidQuestions}>
               {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-              {isSaving ? "Saving..." : "Save Study Set"}
+              {isSaving ? "Đang lưu..." : "Lưu Bộ Đề"}
             </Button>
           </div>
 
           {hasInvalidQuestions ? (
             <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Questions marked in yellow need a question, all four answers, and one correct answer.</span>
+              <span>Câu hỏi màu vàng cần có nội dung, đủ bốn lựa chọn và một đáp án đúng.</span>
             </div>
           ) : null}
 
@@ -202,23 +202,23 @@ export function CreateStudySetClient() {
                 <Card key={question.id} className={errors.length ? "border-amber-300 bg-amber-50/60" : ""}>
                   <CardHeader>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <CardTitle className="text-base">Question {index + 1}</CardTitle>
+                      <CardTitle className="text-base">Câu {index + 1}</CardTitle>
                       {errors.length ? (
                         <Badge variant="warning">
                           <XCircle className="mr-1 h-3.5 w-3.5" />
-                          Needs review
+                          Cần kiểm tra
                         </Badge>
                       ) : (
                         <Badge variant="success">
                           <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                          Valid
+                          Hợp lệ
                         </Badge>
                       )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor={`question-${question.id}`}>Question content</Label>
+                      <Label htmlFor={`question-${question.id}`}>Nội dung câu hỏi</Label>
                       <Textarea
                         id={`question-${question.id}`}
                         value={question.content}
@@ -230,7 +230,7 @@ export function CreateStudySetClient() {
                     <div className="grid gap-3 md:grid-cols-2">
                       {answerKeys.map((key) => (
                         <div key={key} className="space-y-2">
-                          <Label htmlFor={`${question.id}-${key}`}>Option {key}</Label>
+                          <Label htmlFor={`${question.id}-${key}`}>Lựa chọn {key}</Label>
                           <Input
                             id={`${question.id}-${key}`}
                             value={question.options[key]}
@@ -241,7 +241,7 @@ export function CreateStudySetClient() {
                     </div>
 
                     <div className="space-y-2 sm:max-w-xs">
-                      <Label htmlFor={`${question.id}-correct`}>Correct answer</Label>
+                      <Label htmlFor={`${question.id}-correct`}>Đáp án đúng</Label>
                       <select
                         id={`${question.id}-correct`}
                         value={question.correctAnswer ?? ""}
@@ -252,7 +252,7 @@ export function CreateStudySetClient() {
                         }
                         className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <option value="">Select answer</option>
+                        <option value="">Chọn đáp án</option>
                         {answerKeys.map((key) => (
                           <option key={key} value={key}>
                             {key}
@@ -306,17 +306,17 @@ function validateQuestion(question: EditableQuestion) {
   const errors: string[] = [];
 
   if (!question.content.trim()) {
-    errors.push("Question content is missing.");
+    errors.push("Thiếu nội dung câu hỏi.");
   }
 
   for (const key of answerKeys) {
     if (!question.options[key].trim()) {
-      errors.push(`Option ${key} is missing.`);
+      errors.push(`Thiếu lựa chọn ${key}.`);
     }
   }
 
   if (!question.correctAnswer) {
-    errors.push("Correct answer is missing.");
+    errors.push("Thiếu đáp án đúng.");
   }
 
   return errors;

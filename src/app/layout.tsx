@@ -9,7 +9,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Học Trắc Nghiệm",
-  description: "Import exam outlines, practice multiple-choice questions, and review mistakes until mastered.",
+  description: "Nhập đề trắc nghiệm, luyện câu hỏi và ôn lại lỗi sai cho đến khi nắm chắc.",
 };
 
 export default function RootLayout({

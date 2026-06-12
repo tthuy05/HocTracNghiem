@@ -51,7 +51,7 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
     setPendingAnswer(null);
 
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to submit answer.");
+      setError(result.error ?? "Không thể gửi đáp án.");
       return;
     }
 
@@ -82,7 +82,7 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
     setIsResetting(false);
 
     if (!result.ok || !result.data) {
-      setError(result.error ?? "Unable to reset session.");
+      setError(result.error ?? "Không thể đặt lại phiên học.");
       return;
     }
 
@@ -96,22 +96,22 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
       <StudyShell title={session.studySetTitle}>
         <Card className="mx-auto max-w-2xl">
           <CardHeader className="text-center">
-            <Badge variant="warning" className="mx-auto">Round transition</Badge>
-            <CardTitle className="text-2xl">You have completed round {roundTransition.completedRound}</CardTitle>
+            <Badge variant="warning" className="mx-auto">Chuyển vòng</Badge>
+            <CardTitle className="text-2xl">Bạn đã hoàn thành vòng {roundTransition.completedRound}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 text-center">
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-amber-950">
-              <p className="text-sm font-medium">Wrong answers</p>
+              <p className="text-sm font-medium">Số câu sai</p>
               <p className="mt-1 text-4xl font-bold">{roundTransition.wrongCount}</p>
-              <p className="mt-2 text-sm">Continue reviewing the wrong answers.</p>
+              <p className="mt-2 text-sm">Tiếp tục ôn lại các câu đã trả lời sai.</p>
             </div>
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Button size="lg" onClick={() => setRoundTransition(null)}>
-                Start Next Round
+                Bắt Đầu Vòng Tiếp Theo
               </Button>
               <Button size="lg" variant="outline" onClick={handleReset} disabled={isResetting}>
                 {isResetting ? <Loader2 className="h-5 w-5 animate-spin" /> : <RotateCcw className="h-5 w-5" />}
-                Study Again From Start
+                Học Lại Từ Đầu
               </Button>
             </div>
           </CardContent>
@@ -128,29 +128,29 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
             <div className="flex h-14 w-14 items-center justify-center rounded-md bg-emerald-100 text-emerald-800">
               <Trophy className="h-8 w-8" />
             </div>
-            <CardTitle className="text-2xl">Session complete</CardTitle>
+            <CardTitle className="text-2xl">Hoàn thành phiên học</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-3 sm:grid-cols-3">
-              <Stat label="Total questions" value={session.totalQuestions} />
-              <Stat label="Rounds completed" value={session.currentRound} />
-              <Stat label="Wrong attempts" value={session.totalWrongAttempts} />
+              <Stat label="Tổng số câu" value={session.totalQuestions} />
+              <Stat label="Số vòng đã học" value={session.currentRound} />
+              <Stat label="Lượt trả lời sai" value={session.totalWrongAttempts} />
             </div>
             <div className="flex flex-col justify-center gap-3 sm:flex-row sm:flex-wrap">
               <Button size="lg" onClick={handleReset} disabled={isResetting}>
                 {isResetting ? <Loader2 className="h-5 w-5 animate-spin" /> : <RotateCcw className="h-5 w-5" />}
-                Study Again From Start
+                Học Lại Từ Đầu
               </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href={`/study-sets/${session.studySetId}`}>
                   <ArrowLeft className="h-5 w-5" />
-                  Back to Study Set
+                  Quay lại bộ đề
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href="/">
                   <Home className="h-5 w-5" />
-                  Go to Home
+                  Về trang chủ
                 </Link>
               </Button>
             </div>
@@ -169,21 +169,21 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
         <div className="rounded-lg border bg-card/85 p-5 shadow-soft">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <Badge variant="secondary">Round {session.currentRound}</Badge>
+              <Badge variant="secondary">Vòng {session.currentRound}</Badge>
               <h1 className="break-words text-xl font-bold sm:text-2xl">{session.studySetTitle}</h1>
               <p className="text-sm text-muted-foreground">
-                Question {Math.min(session.currentIndex + 1, session.currentQueue.length)} / {session.currentQueue.length} in this round
+                Câu {Math.min(session.currentIndex + 1, session.currentQueue.length)} / {session.currentQueue.length} trong vòng này
               </p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleReset} disabled={isResetting}>
                 {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                Study Again From Start
+                Học Lại Từ Đầu
               </Button>
               <Button asChild variant="outline">
                 <Link href={`/study-sets/${session.studySetId}`}>
                   <ArrowLeft className="h-4 w-4" />
-                  Exit
+                  Thoát
                 </Link>
               </Button>
             </div>
@@ -247,10 +247,10 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
                 >
                   <p className="text-sm font-medium">
                     {answerResult.answer.isCorrect
-                      ? "Correct. Nice work."
-                      : `Wrong. The correct answer is ${answerResult.answer.correctAnswer}.`}
+                      ? "Chính xác. Làm tốt lắm."
+                      : `Chưa đúng. Đáp án đúng là ${answerResult.answer.correctAnswer}.`}
                   </p>
-                  <Button onClick={handleContinue}>Continue</Button>
+                  <Button onClick={handleContinue}>Tiếp tục</Button>
                 </div>
               ) : null}
 
@@ -260,7 +260,7 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
         ) : (
           <Card className="border-amber-200">
             <CardContent className="py-10 text-center">
-              <p className="text-sm text-muted-foreground">No active question is available for this session.</p>
+              <p className="text-sm text-muted-foreground">Không có câu hỏi đang hoạt động trong phiên học này.</p>
             </CardContent>
           </Card>
         )}

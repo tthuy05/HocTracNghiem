@@ -145,19 +145,19 @@ export function validateParsedQuestion(question: Pick<ParsedQuestion, "content" 
   const errors: string[] = [];
 
   if (!question.content.trim()) {
-    errors.push("Question content is missing.");
+    errors.push("Thiếu nội dung câu hỏi.");
   }
 
   for (const key of ANSWER_KEYS) {
     if (!question.options[key]?.trim()) {
-      errors.push(`Option ${key} is missing.`);
+      errors.push(`Thiếu đáp án ${key}.`);
     }
   }
 
   if (!question.correctAnswer) {
-    errors.push("Correct answer is missing.");
+    errors.push("Thiếu đáp án đúng.");
   } else if (!ANSWER_KEYS.includes(question.correctAnswer)) {
-    errors.push("Correct answer must be A, B, C, or D.");
+    errors.push("Đáp án đúng phải là A, B, C hoặc D.");
   }
 
   return errors;

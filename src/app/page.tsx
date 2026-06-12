@@ -22,13 +22,13 @@ export default async function HomePage() {
               <h1 className="text-2xl font-bold tracking-normal text-foreground sm:text-3xl">Học Trắc Nghiệm</h1>
             </div>
             <p className="text-sm leading-6 text-muted-foreground sm:text-base">
-              Import your exam outline, practice each question, and review wrong answers until you master them.
+              Nhập đề trắc nghiệm, luyện từng câu và ôn lại các câu sai cho đến khi nắm chắc.
             </p>
           </div>
           <Button asChild size="lg">
             <Link href="/study-sets/new">
               <Plus className="h-5 w-5" />
-              Create New Study Set
+              Tạo Bộ Đề Mới
             </Link>
           </Button>
         </header>
@@ -36,10 +36,10 @@ export default async function HomePage() {
         <section className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Study sets</h2>
-              <p className="text-sm text-muted-foreground">Your saved outlines are stored in the database.</p>
+              <h2 className="text-xl font-semibold">Bộ đề đã lưu</h2>
+              <p className="text-sm text-muted-foreground">Các bộ đề của bạn được lưu trong cơ sở dữ liệu.</p>
             </div>
-            <Badge variant="secondary">{studySets.length} total</Badge>
+            <Badge variant="secondary">{studySets.length} bộ đề</Badge>
           </div>
 
           {studySets.length === 0 ? (
@@ -49,15 +49,15 @@ export default async function HomePage() {
                   <FilePlus2 className="h-7 w-7" />
                 </div>
                 <div className="max-w-md space-y-2">
-                  <h3 className="text-lg font-semibold">No study sets yet</h3>
+                  <h3 className="text-lg font-semibold">Chưa có bộ đề nào</h3>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Create your first set by pasting an outline or uploading a .docx file.
+                    Tạo bộ đề đầu tiên bằng cách dán nội dung hoặc tải lên tệp .docx.
                   </p>
                 </div>
                 <Button asChild>
                   <Link href="/study-sets/new">
                     <Plus className="h-4 w-4" />
-                    Create New Study Set
+                    Tạo Bộ Đề Mới
                   </Link>
                 </Button>
               </CardContent>
@@ -69,35 +69,35 @@ export default async function HomePage() {
                   <CardHeader>
                     <div className="flex items-start justify-between gap-3">
                       <CardTitle className="min-w-0 break-words">{studySet.title}</CardTitle>
-                      <Badge>{studySet.questionCount} questions</Badge>
+                      <Badge>{studySet.questionCount} câu</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 space-y-3">
                     <p className="flex items-center gap-2 text-sm text-muted-foreground">
                       <CalendarDays className="h-4 w-4" />
-                      Created {formatDate(studySet.createdAt)}
+                      Tạo ngày {formatDate(studySet.createdAt)}
                     </p>
                     {studySet.sourceFileName ? (
-                      <p className="truncate text-sm text-muted-foreground">Source: {studySet.sourceFileName}</p>
+                      <p className="truncate text-sm text-muted-foreground">Nguồn: {studySet.sourceFileName}</p>
                     ) : null}
                   </CardContent>
                   <CardFooter className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap">
                     <form action={startStudySessionAction.bind(null, studySet.id)}>
                       <Button type="submit" className="w-full sm:w-auto">
                         <Play className="h-4 w-4" />
-                        Start Studying
+                        Bắt Đầu Học
                       </Button>
                     </form>
                     <Button asChild variant="outline" className="w-full sm:w-auto">
                       <Link href={`/study-sets/${studySet.id}`}>
                         <Eye className="h-4 w-4" />
-                        View Details
+                        Xem Chi Tiết
                       </Link>
                     </Button>
                     <form action={deleteStudySetAction.bind(null, studySet.id, false)}>
                       <Button type="submit" variant="destructive" className="w-full sm:w-auto">
                         <Trash2 className="h-4 w-4" />
-                        Delete
+                        Xóa
                       </Button>
                     </form>
                   </CardFooter>

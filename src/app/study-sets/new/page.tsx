@@ -10,15 +10,15 @@ export default function NewStudySetPage() {
         <Button asChild variant="ghost">
           <Link href="/">
             <ArrowLeft className="h-4 w-4" />
-            Back
+            Quay lại
           </Link>
         </Button>
 
         <header className="rounded-lg border bg-card/85 p-5 shadow-soft">
           <div className="max-w-3xl space-y-2">
-            <h1 className="text-2xl font-bold sm:text-3xl">Create New Study Set</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">Tạo Bộ Đề Mới</h1>
             <p className="text-sm leading-6 text-muted-foreground sm:text-base">
-              Paste an outline or upload a .docx file, review the detected questions, then save the set.
+              Dán nội dung đề hoặc tải lên tệp .docx, kiểm tra các câu đã nhận diện rồi lưu bộ đề.
             </p>
           </div>
         </header>

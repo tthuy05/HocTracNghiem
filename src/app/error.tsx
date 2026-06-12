@@ -14,15 +14,15 @@ export default function ErrorPage({
     <main className="container flex min-h-screen items-center justify-center py-10">
       <Card className="w-full max-w-lg border-red-200">
         <CardHeader>
-          <CardTitle>Something went wrong</CardTitle>
+          <CardTitle>Đã xảy ra lỗi</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-sm leading-6 text-muted-foreground">
-            The app could not finish the request. Try again or return to the previous screen.
+            Ứng dụng chưa thể hoàn tất yêu cầu. Hãy thử lại hoặc quay về màn hình trước.
           </p>
           <Button onClick={reset}>
             <RotateCcw className="h-4 w-4" />
-            Try Again
+            Thử lại
           </Button>
         </CardContent>
       </Card>

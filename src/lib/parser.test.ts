@@ -72,7 +72,7 @@ D. Delta
 
     expect(result.validCount).toBe(0);
     expect(result.missingAnswerCount).toBe(1);
-    expect(result.questions[0].errors).toContain("Correct answer is missing.");
+    expect(result.questions[0].errors).toContain("Thiếu đáp án đúng.");
   });
 
   it("uses emphasized options as a best-effort correct answer signal", () => {

@@ -145,11 +145,11 @@ export async function startStudySession(studySetId: string): Promise<StudySessio
   });
 
   if (!studySet) {
-    throw new Error("Study set not found.");
+    throw new Error("Không tìm thấy bộ đề.");
   }
 
   if (!studySet.questions.length) {
-    throw new Error("This study set has no questions.");
+    throw new Error("Bộ đề này chưa có câu hỏi.");
   }
 
   const initialState = createInitialSessionState(studySet.questions.map((question) => question.id));
@@ -203,12 +203,12 @@ export async function submitAnswer(
   });
 
   if (!session) {
-    throw new Error("Study session not found.");
+    throw new Error("Không tìm thấy phiên học.");
   }
 
   const question = session.studySet.questions.find((item) => item.id === questionId);
   if (!question) {
-    throw new Error("Question not found in this study set.");
+    throw new Error("Không tìm thấy câu hỏi trong bộ đề này.");
   }
 
   const correctAnswer = parseAnswerKey(question.correctAnswer);
@@ -263,7 +263,7 @@ export async function resetStudySession(sessionId: string): Promise<StudySession
   });
 
   if (!session) {
-    throw new Error("Study session not found.");
+    throw new Error("Không tìm thấy phiên học.");
   }
 
   const resetState = resetSessionState(session.studySet.questions.map((question) => question.id));
@@ -398,7 +398,7 @@ function parseStringArray(value: string) {
 function parseAnswerKey(value: string): AnswerKey {
   const upper = value.toUpperCase();
   if (!ANSWER_KEYS.includes(upper as AnswerKey)) {
-    throw new Error("Invalid answer key stored in the database.");
+    throw new Error("Đáp án lưu trong cơ sở dữ liệu không hợp lệ.");
   }
 
   return upper as AnswerKey;

@@ -8,16 +8,16 @@ export default function NotFound() {
     <main className="container flex min-h-screen items-center justify-center py-10">
       <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle>Study set not found</CardTitle>
+          <CardTitle>Không tìm thấy bộ đề</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-sm leading-6 text-muted-foreground">
-            The study set or session may have been deleted.
+            Bộ đề hoặc phiên học có thể đã bị xóa.
           </p>
           <Button asChild>
             <Link href="/">
               <ArrowLeft className="h-4 w-4" />
-              Go to Home
+              Về trang chủ
             </Link>
           </Button>
         </CardContent>

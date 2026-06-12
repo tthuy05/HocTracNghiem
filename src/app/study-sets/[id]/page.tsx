@@ -23,29 +23,29 @@ export default async function StudySetDetailPage({ params }: { params: Promise<{
         <Button asChild variant="ghost">
           <Link href="/">
             <ArrowLeft className="h-4 w-4" />
-            Back
+            Quay lại
           </Link>
         </Button>
 
         <header className="space-y-5 rounded-lg border bg-card/85 p-5 shadow-soft">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-2">
-              <Badge variant="secondary">{studySet.questionCount} questions</Badge>
+              <Badge variant="secondary">{studySet.questionCount} câu</Badge>
               <h1 className="break-words text-2xl font-bold sm:text-3xl">{studySet.title}</h1>
-              <p className="text-sm text-muted-foreground">Created {formatDate(studySet.createdAt)}</p>
+              <p className="text-sm text-muted-foreground">Tạo ngày {formatDate(studySet.createdAt)}</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <form action={startStudySessionAction.bind(null, studySet.id)}>
                 <Button type="submit">
                   <Play className="h-4 w-4" />
-                  Start Studying
+                  Bắt Đầu Học
                 </Button>
               </form>
               <RenameStudySetForm studySetId={studySet.id} currentTitle={studySet.title} />
               <form action={deleteStudySetAction.bind(null, studySet.id, true)}>
                 <Button type="submit" variant="destructive">
                   <Trash2 className="h-4 w-4" />
-                  Delete Study Set
+                  Xóa Bộ Đề
                 </Button>
               </form>
             </div>
@@ -54,8 +54,8 @@ export default async function StudySetDetailPage({ params }: { params: Promise<{
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-xl font-semibold">Question list</h2>
-            <p className="text-sm text-muted-foreground">Each card shows the four options and the saved answer key.</p>
+            <h2 className="text-xl font-semibold">Danh sách câu hỏi</h2>
+            <p className="text-sm text-muted-foreground">Mỗi thẻ hiển thị bốn lựa chọn và đáp án đúng đã lưu.</p>
           </div>
           <div className="grid gap-4">
             {studySet.questions.map((question) => (
@@ -63,11 +63,11 @@ export default async function StudySetDetailPage({ params }: { params: Promise<{
                 <CardHeader>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <CardTitle className="text-base">
-                      Question {question.orderIndex + 1}
+                      Câu {question.orderIndex + 1}
                     </CardTitle>
                     <Badge variant="success">
                       <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                      Correct: {question.correctAnswer}
+                      Đáp án đúng: {question.correctAnswer}
                     </Badge>
                   </div>
                 </CardHeader>

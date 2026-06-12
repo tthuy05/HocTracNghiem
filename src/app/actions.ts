@@ -32,21 +32,21 @@ type ActionResult<T> = {
 const answerKeySchema = z.enum(ANSWER_KEYS);
 
 const questionInputSchema = z.object({
-  content: z.string().trim().min(1, "Question content is required."),
+  content: z.string().trim().min(1, "Nội dung câu hỏi là bắt buộc."),
   options: z.object({
-    A: z.string().trim().min(1, "Option A is required."),
-    B: z.string().trim().min(1, "Option B is required."),
-    C: z.string().trim().min(1, "Option C is required."),
-    D: z.string().trim().min(1, "Option D is required."),
+    A: z.string().trim().min(1, "Đáp án A là bắt buộc."),
+    B: z.string().trim().min(1, "Đáp án B là bắt buộc."),
+    C: z.string().trim().min(1, "Đáp án C là bắt buộc."),
+    D: z.string().trim().min(1, "Đáp án D là bắt buộc."),
   }),
   correctAnswer: answerKeySchema,
   explanation: z.string().optional(),
 });
 
 const createStudySetSchema = z.object({
-  title: z.string().trim().min(1, "Study set title is required.").max(120),
+  title: z.string().trim().min(1, "Tên bộ đề là bắt buộc.").max(120),
   sourceFileName: z.string().optional(),
-  questions: z.array(questionInputSchema).min(1, "At least one valid question is required."),
+  questions: z.array(questionInputSchema).min(1, "Cần ít nhất một câu hỏi hợp lệ."),
 });
 
 export async function parseImportedContentAction(formData: FormData): Promise<ActionResult<ParseResult & { sourceFileName?: string }>> {
@@ -59,7 +59,7 @@ export async function parseImportedContentAction(formData: FormData): Promise<Ac
 
     if (maybeFile instanceof File && maybeFile.size > 0) {
       if (!maybeFile.name.toLowerCase().endsWith(".docx")) {
-        return { ok: false, error: "Only .docx files are supported." };
+        return { ok: false, error: "Chỉ hỗ trợ tệp .docx." };
       }
 
       const extracted = await extractDocxForParsing(await maybeFile.arrayBuffer());
@@ -69,12 +69,12 @@ export async function parseImportedContentAction(formData: FormData): Promise<Ac
     }
 
     if (!importedText.trim()) {
-      return { ok: false, error: "Paste text or upload a .docx file before analyzing." };
+      return { ok: false, error: "Hãy dán nội dung hoặc tải tệp .docx trước khi phân tích." };
     }
 
     const result = parseQuestionsFromText(importedText, { emphasizedAnswersByOrder });
     if (!result.totalDetected) {
-      return { ok: false, error: "No questions were detected. Check the question numbering format." };
+      return { ok: false, error: "Không phát hiện câu hỏi nào. Hãy kiểm tra định dạng đánh số câu." };
     }
 
     return {
@@ -85,7 +85,7 @@ export async function parseImportedContentAction(formData: FormData): Promise<Ac
       },
     };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Unable to parse the imported content." };
+    return { ok: false, error: error instanceof Error ? error.message : "Không thể phân tích nội dung đã nhập." };
   }
 }
 
@@ -93,12 +93,12 @@ export async function createStudySetAction(input: CreateStudySetInput): Promise<
   const parsed = createStudySetSchema.safeParse(input);
 
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid study set data." };
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu bộ đề không hợp lệ." };
   }
 
   const invalidQuestion = parsed.data.questions.find((question) => validateParsedQuestion(question).length > 0);
   if (invalidQuestion) {
-    return { ok: false, error: "Fix all invalid questions before saving." };
+    return { ok: false, error: "Hãy sửa tất cả câu hỏi chưa hợp lệ trước khi lưu." };
   }
 
   try {
@@ -106,7 +106,7 @@ export async function createStudySetAction(input: CreateStudySetInput): Promise<
     revalidatePath("/");
     return { ok: true, data: { id: studySet.id } };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Unable to save the study set." };
+    return { ok: false, error: error instanceof Error ? error.message : "Không thể lưu bộ đề." };
   }
 }
 
@@ -140,13 +140,13 @@ export async function submitAnswerAction(
   selectedAnswer: AnswerKey,
 ): Promise<ActionResult<SubmitAnswerResult>> {
   if (!ANSWER_KEYS.includes(selectedAnswer)) {
-    return { ok: false, error: "Selected answer must be A, B, C, or D." };
+    return { ok: false, error: "Đáp án chọn phải là A, B, C hoặc D." };
   }
 
   try {
     return { ok: true, data: await submitAnswer(sessionId, questionId, selectedAnswer) };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Unable to submit the answer." };
+    return { ok: false, error: error instanceof Error ? error.message : "Không thể gửi đáp án." };
   }
 }
 
@@ -154,6 +154,6 @@ export async function resetStudySessionAction(sessionId: string): Promise<Action
   try {
     return { ok: true, data: await resetStudySession(sessionId) };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Unable to reset the study session." };
+    return { ok: false, error: error instanceof Error ? error.message : "Không thể đặt lại phiên học." };
   }
 }

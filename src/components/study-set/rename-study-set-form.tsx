@@ -14,7 +14,7 @@ export function RenameStudySetForm({ studySetId, currentTitle }: { studySetId: s
     return (
       <Button type="button" variant="outline" onClick={() => setIsEditing(true)}>
         <Pencil className="h-4 w-4" />
-        Rename Study Set
+        Đổi Tên Bộ Đề
       </Button>
     );
   }
@@ -29,15 +29,15 @@ export function RenameStudySetForm({ studySetId, currentTitle }: { studySetId: s
       }}
       className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"
     >
-      <Input name="title" defaultValue={currentTitle} aria-label="Study set title" className="sm:w-64" />
+      <Input name="title" defaultValue={currentTitle} aria-label="Tên bộ đề" className="sm:w-64" />
       <div className="flex gap-2">
         <Button type="submit" disabled={isPending}>
           <Check className="h-4 w-4" />
-          Save
+          Lưu
         </Button>
         <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
           <X className="h-4 w-4" />
-          Cancel
+          Hủy
         </Button>
       </div>
     </form>
