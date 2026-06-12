@@ -47,6 +47,20 @@ Answer: A
     expect(result.questions[0].correctAnswer).toBe("A");
   });
 
+  it("removes inline Vietnamese answer labels from option text", () => {
+    const result = parseQuestionsFromText(`
+Câu 1: File system nào hỗ trợ ACL?
+A. FAT
+B. FAT32
+C. HPFS
+D. NTFS Đáp án đúng: D
+`);
+
+    expect(result.questions[0].options.D).toBe("NTFS");
+    expect(result.questions[0].correctAnswer).toBe("D");
+    expect(result.questions[0].errors).toHaveLength(0);
+  });
+
   it("marks a question invalid when the correct answer is missing", () => {
     const result = parseQuestionsFromText(`
 Cau 1. Missing answer example

@@ -32,6 +32,9 @@ type DocxExtraction = {
 const questionStartPattern = /^(?:(?:câu|cau|question)\s*\d+\s*[:.]|\d+\s*[.)])\s*(.*)$/iu;
 const answerPattern = /^(?:đáp\s*án|dap\s*an|answer|correct(?:\s+answer)?)\s*[:\-]\s*([A-D])\b/iu;
 const optionPattern = /^([A-D])\s*(?:[.)-])\s*(.+)$/iu;
+const qualifiedAnswerPattern = /^(?:đáp\s*án\s*đúng|dap\s*an\s*dung)\s*[:\-]\s*([A-D])\b/iu;
+const inlineAnswerPattern =
+  /(?:^|\s)(?:đáp\s*án(?:\s*đúng)?|dap\s*an(?:\s*dung)?|answer|correct(?:\s+answer)?)\s*[:\-]\s*([A-D])\b.*$/iu;
 
 export function parseQuestionsFromText(input: string, options: ParseOptions = {}): ParseResult {
   const normalized = normalizeText(input);
@@ -79,7 +82,8 @@ function parseQuestionBlock(lines: string[], index: number, emphasizedAnswer?: A
       continue;
     }
 
-    const answerMatch = stripInlineMarkup(trimmed).match(answerPattern);
+    const cleanLine = stripInlineMarkup(trimmed);
+    const answerMatch = cleanLine.match(qualifiedAnswerPattern) ?? cleanLine.match(answerPattern);
     if (answerMatch) {
       explicitAnswer = answerMatch[1].toUpperCase() as AnswerKey;
       currentOption = null;
@@ -89,7 +93,12 @@ function parseQuestionBlock(lines: string[], index: number, emphasizedAnswer?: A
     const optionMatch = parseOptionLine(trimmed);
     if (optionMatch) {
       currentOption = optionMatch.key;
-      options[currentOption].push(optionMatch.value);
+      if (optionMatch.value) {
+        options[currentOption].push(optionMatch.value);
+      }
+      if (optionMatch.inlineAnswer) {
+        explicitAnswer = optionMatch.inlineAnswer;
+      }
       if (!emphasizedOptionAnswer && isEmphasizedLine(trimmed)) {
         emphasizedOptionAnswer = currentOption;
       }
@@ -97,9 +106,15 @@ function parseQuestionBlock(lines: string[], index: number, emphasizedAnswer?: A
     }
 
     if (currentOption) {
-      options[currentOption].push(stripInlineMarkup(trimmed));
+      const continuation = splitInlineAnswer(trimmed);
+      if (continuation.text) {
+        options[currentOption].push(continuation.text);
+      }
+      if (continuation.answer) {
+        explicitAnswer = continuation.answer;
+      }
     } else {
-      contentLines.push(stripInlineMarkup(trimmed));
+      contentLines.push(cleanLine);
     }
   }
 
@@ -177,7 +192,7 @@ function splitQuestionBlocks(text: string) {
   return blocks;
 }
 
-function parseOptionLine(line: string): { key: AnswerKey; value: string } | null {
+function parseOptionLine(line: string): { key: AnswerKey; value: string; inlineAnswer?: AnswerKey } | null {
   const cleanLine = stripInlineMarkup(line);
   const match = cleanLine.match(optionPattern);
 
@@ -185,9 +200,26 @@ function parseOptionLine(line: string): { key: AnswerKey; value: string } | null
     return null;
   }
 
+  const inlineAnswer = splitInlineAnswer(match[2]);
+
   return {
     key: match[1].toUpperCase() as AnswerKey,
-    value: normalizeWhitespace(match[2]),
+    value: inlineAnswer.text,
+    inlineAnswer: inlineAnswer.answer,
+  };
+}
+
+function splitInlineAnswer(value: string): { text: string; answer?: AnswerKey } {
+  const cleanValue = stripInlineMarkup(value);
+  const answerMatch = cleanValue.match(inlineAnswerPattern);
+
+  if (!answerMatch || answerMatch.index === undefined) {
+    return { text: normalizeWhitespace(cleanValue) };
+  }
+
+  return {
+    text: normalizeWhitespace(cleanValue.slice(0, answerMatch.index)),
+    answer: answerMatch[1].toUpperCase() as AnswerKey,
   };
 }
 
