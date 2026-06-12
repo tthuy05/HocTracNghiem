@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model StudySet {
+  id             String         @id @default(cuid())
+  title          String
+  sourceFileName String?
+  questionCount  Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  questions      Question[]
+  sessions       StudySession[]
+}
+
+model Question {
+  id            String          @id @default(cuid())
+  studySetId    String
+  orderIndex    Int
+  content       String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctAnswer String
+  explanation   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  studySet      StudySet        @relation(fields: [studySetId], references: [id], onDelete: Cascade)
+  attempts      AnswerAttempt[]
+
+  @@index([studySetId, orderIndex])
+}
+
+model StudySession {
+  id                 String          @id @default(cuid())
+  studySetId         String
+  status             String          @default("IN_PROGRESS")
+  currentRound       Int             @default(1)
+  currentIndex       Int             @default(0)
+  currentQueueJson   String          @default("[]")
+  wrongQueueJson     String          @default("[]")
+  totalWrongAttempts Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  studySet           StudySet        @relation(fields: [studySetId], references: [id], onDelete: Cascade)
+  attempts           AnswerAttempt[]
+
+  @@index([studySetId, status])
+}
+
+model AnswerAttempt {
+  id             String       @id @default(cuid())
+  sessionId      String
+  questionId     String
+  selectedAnswer String
+  correctAnswer  String
+  isCorrect      Boolean
+  round          Int
+  createdAt      DateTime     @default(now())
+  session        StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question       Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, round])
+  @@index([questionId])
+}
