@@ -100,7 +100,13 @@ function parseQuestionBlock(lines: string[], index: number, emphasizedAnswer?: A
     if (inlineOptions.options.length) {
       const prefix = normalizeWhitespace(inlineOptions.prefix);
       if (prefix) {
-        if (currentOption) {
+        const prefixOption = getMissingOptionForPrefix(prefix, inlineOptions.options[0].key, currentOption, options);
+        if (prefixOption) {
+          options[prefixOption].push(prefix);
+          if (!emphasizedOptionAnswer && isTextEmphasizedInLine(trimmed, prefix)) {
+            emphasizedOptionAnswer = prefixOption;
+          }
+        } else if (currentOption) {
           options[currentOption].push(prefix);
         } else {
           contentLines.push(prefix);
@@ -117,26 +123,51 @@ function parseQuestionBlock(lines: string[], index: number, emphasizedAnswer?: A
         }
       }
 
-      if (
-        inlineOptions.options.length === 1 &&
-        !emphasizedOptionAnswer &&
-        isEmphasizedOptionLine(trimmed)
-      ) {
-        emphasizedOptionAnswer = inlineOptions.options[0].key;
+      const emphasizedInlineAnswer = getEmphasizedAnswerFromLine(trimmed, inlineOptions.options);
+      if (!emphasizedOptionAnswer && emphasizedInlineAnswer) {
+        emphasizedOptionAnswer = emphasizedInlineAnswer;
       }
+
       continue;
     }
 
     if (currentOption) {
       const continuation = splitInlineAnswer(trimmed);
       if (continuation.text) {
-        options[currentOption].push(continuation.text);
+        const nextOption = getNextUnlabeledOption(trimmed, currentOption, options);
+        if (nextOption) {
+          currentOption = nextOption;
+          options[currentOption].push(continuation.text);
+          if (!emphasizedOptionAnswer && isEmphasizedLine(trimmed)) {
+            emphasizedOptionAnswer = currentOption;
+          }
+        } else {
+          options[currentOption].push(continuation.text);
+        }
       }
       if (continuation.answer) {
         explicitAnswer = continuation.answer;
       }
     } else {
-      contentLines.push(cleanLine);
+      contentLines.push(trimmed);
+    }
+  }
+
+  const promotedAnswer = promoteTrailingContentToMissingOptions(contentLines, options);
+  if (!emphasizedOptionAnswer && promotedAnswer) {
+    emphasizedOptionAnswer = promotedAnswer;
+  }
+
+  if (!hasParsedOptions(options)) {
+    const inferred = inferUnlabeledOptions(contentLines);
+    if (inferred) {
+      contentLines.splice(0, contentLines.length, ...inferred.contentLines);
+      for (const key of ANSWER_KEYS) {
+        options[key].push(inferred.options[key]);
+      }
+      if (!emphasizedOptionAnswer && inferred.emphasizedAnswer) {
+        emphasizedOptionAnswer = inferred.emphasizedAnswer;
+      }
     }
   }
 
@@ -152,7 +183,7 @@ function parseQuestionBlock(lines: string[], index: number, emphasizedAnswer?: A
   const parsed: ParsedQuestion = {
     id: `parsed-${index + 1}`,
     orderIndex: index,
-    content: normalizeWhitespace(contentLines.join(" ")),
+    content: normalizeWhitespace(contentLines.map(stripInlineMarkup).join(" ")),
     options: normalizedOptions,
     correctAnswer,
     errors: [],
@@ -222,18 +253,75 @@ function getQuestionStartText(line: string, currentBlock: string[]) {
 
   const numberedMatch = line.match(numberedQuestionStartPattern);
   if (!numberedMatch) {
+    if (
+      (blockHasCompleteOptionMarkers(currentBlock) || blockHasUnlabeledOptionTail(currentBlock)) &&
+      looksLikeQuestionStartWithoutMarker(line)
+    ) {
+      return line;
+    }
+
+    const embeddedNumberedQuestion = getEmbeddedNumberedQuestionText(line);
+    if (embeddedNumberedQuestion && canStartQuestionAfterBlock(currentBlock)) {
+      return embeddedNumberedQuestion;
+    }
     return null;
   }
 
-  if (currentBlock.length === 0 || blockHasOptionMarkers(currentBlock)) {
+  if (canStartQuestionAfterBlock(currentBlock)) {
     return numberedMatch[1] ?? "";
   }
 
   return null;
 }
 
+function canStartQuestionAfterBlock(lines: string[]) {
+  return lines.length === 0 || blockHasOptionMarkers(lines) || blockHasUnlabeledOptionTail(lines);
+}
+
 function blockHasOptionMarkers(lines: string[]) {
   return lines.some((line) => splitInlineOptions(line).options.length > 0);
+}
+
+function blockHasCompleteOptionMarkers(lines: string[]) {
+  const keys = new Set(lines.flatMap((line) => splitInlineOptions(line).options.map((option) => option.key)));
+  return ANSWER_KEYS.every((key) => keys.has(key));
+}
+
+function blockHasUnlabeledOptionTail(lines: string[]) {
+  const meaningfulLines = lines.filter((line) => normalizeWhitespace(stripInlineMarkup(line)));
+  if (meaningfulLines.length < ANSWER_KEYS.length + 1 || blockHasOptionMarkers(lines)) {
+    return false;
+  }
+
+  const optionLikeTail = meaningfulLines.slice(-ANSWER_KEYS.length);
+  return (
+    optionLikeTail.some(isEmphasizedLine) &&
+    optionLikeTail.every((line) => {
+      const cleanLine = normalizeWhitespace(stripInlineMarkup(line));
+      return cleanLine.length >= 2 && cleanLine.length <= 180 && !cleanLine.endsWith("?");
+    })
+  );
+}
+
+function looksLikeQuestionStartWithoutMarker(line: string) {
+  const cleanLine = normalizeWhitespace(stripInlineMarkup(line));
+  if (!cleanLine) {
+    return false;
+  }
+
+  const inlineOptions = splitInlineOptions(cleanLine);
+  if (inlineOptions.options.length) {
+    const prefix = normalizeWhitespace(inlineOptions.prefix);
+    return prefix.length >= 15 && prefix.includes("?");
+  }
+
+  return cleanLine.length >= 80 || cleanLine.includes("?");
+}
+
+function getEmbeddedNumberedQuestionText(line: string) {
+  const cleanLine = normalizeWhitespace(stripInlineMarkup(line));
+  const match = cleanLine.match(/^(?:CLO[\w.]*\s*[–-]\s*.+?\s+)?\d+\s*[.)]\s*(.+)$/iu);
+  return match?.[1] ?? null;
 }
 
 function splitInlineOptions(line: string): {
@@ -242,7 +330,7 @@ function splitInlineOptions(line: string): {
 } {
   const cleanLine = stripInlineMarkup(line);
   const optionMarkerPattern = /(^|\s)([A-D])\s*(?:[.)-])\s*/giu;
-  const markers = Array.from(cleanLine.matchAll(optionMarkerPattern)).map((match) => ({
+  let markers = Array.from(cleanLine.matchAll(optionMarkerPattern)).map((match) => ({
     key: match[2].toUpperCase() as AnswerKey,
     markerStart: (match.index ?? 0) + match[1].length,
     valueStart: (match.index ?? 0) + match[0].length,
@@ -253,6 +341,19 @@ function splitInlineOptions(line: string): {
       prefix: cleanLine,
       options: [],
     };
+  }
+
+  const prefix = cleanLine.slice(0, markers[0].markerStart);
+  const missingOptionAStart = getMissingOptionAStart(prefix, markers[0].key);
+  if (missingOptionAStart !== null) {
+    markers = [
+      {
+        key: "A",
+        markerStart: missingOptionAStart,
+        valueStart: missingOptionAStart,
+      },
+      ...markers,
+    ];
   }
 
   return {
@@ -269,6 +370,120 @@ function splitInlineOptions(line: string): {
       };
     }),
   };
+}
+
+function getMissingOptionAStart(prefix: string, firstOptionKey: AnswerKey) {
+  const cleanPrefix = normalizeWhitespace(prefix);
+  if (firstOptionKey !== "B" || !cleanPrefix) {
+    return null;
+  }
+
+  const questionMarkIndex = prefix.lastIndexOf("?");
+  if (questionMarkIndex >= 0) {
+    const optionText = normalizeWhitespace(prefix.slice(questionMarkIndex + 1));
+    return isMissingOptionAValue(optionText) ? questionMarkIndex + 1 : null;
+  }
+
+  return isMissingOptionAValue(cleanPrefix) ? 0 : null;
+}
+
+function isMissingOptionAValue(value: string) {
+  return (
+    value.length > 0 &&
+    value.length <= 120 &&
+    !value.includes("?") &&
+    !labeledQuestionStartPattern.test(value)
+  );
+}
+
+function getMissingOptionForPrefix(
+  prefix: string,
+  firstInlineOption: AnswerKey,
+  currentOption: AnswerKey | null,
+  options: Record<AnswerKey, string[]>,
+): AnswerKey | null {
+  if (!isOptionLikeText(prefix)) {
+    return null;
+  }
+
+  const firstInlineIndex = ANSWER_KEYS.indexOf(firstInlineOption);
+  const candidate = currentOption
+    ? ANSWER_KEYS[ANSWER_KEYS.indexOf(currentOption) + 1]
+    : ANSWER_KEYS[firstInlineIndex - 1];
+
+  if (!candidate) {
+    return null;
+  }
+
+  return ANSWER_KEYS.indexOf(candidate) < firstInlineIndex && !options[candidate].length ? candidate : null;
+}
+
+function getNextUnlabeledOption(
+  line: string,
+  currentOption: AnswerKey,
+  options: Record<AnswerKey, string[]>,
+): AnswerKey | null {
+  const nextOption = ANSWER_KEYS[ANSWER_KEYS.indexOf(currentOption) + 1];
+  if (!nextOption || options[nextOption].length || !options[currentOption].length || !isOptionLikeText(line)) {
+    return null;
+  }
+
+  return nextOption;
+}
+
+function promoteTrailingContentToMissingOptions(
+  contentLines: string[],
+  options: Record<AnswerKey, string[]>,
+): AnswerKey | undefined {
+  if (!hasParsedOptions(options)) {
+    return undefined;
+  }
+
+  const missingKeys = ANSWER_KEYS.filter((key) => !options[key].some((value) => value.trim()));
+  if (!missingKeys.length) {
+    return undefined;
+  }
+
+  const promotedLines: string[] = [];
+  while (promotedLines.length < missingKeys.length && contentLines.length) {
+    const candidate = contentLines[contentLines.length - 1];
+    if (!isOptionLikeText(candidate)) {
+      break;
+    }
+    promotedLines.unshift(contentLines.pop() ?? "");
+  }
+
+  if (promotedLines.length !== missingKeys.length) {
+    contentLines.push(...promotedLines);
+    return undefined;
+  }
+
+  let emphasizedAnswer: AnswerKey | undefined;
+  for (const [index, key] of missingKeys.entries()) {
+    const line = promotedLines[index];
+    options[key].push(stripInlineMarkup(line));
+    if (isEmphasizedLine(line)) {
+      emphasizedAnswer = key;
+    }
+  }
+
+  return emphasizedAnswer;
+}
+
+function isOptionLikeText(value: string) {
+  const cleanValue = normalizeWhitespace(stripInlineMarkup(value));
+  return (
+    cleanValue.length >= 2 &&
+    cleanValue.length <= 220 &&
+    !cleanValue.endsWith("?") &&
+    !labeledQuestionStartPattern.test(cleanValue) &&
+    !looksLikeNumberedQuestionLine(cleanValue) &&
+    !getEmbeddedNumberedQuestionText(cleanValue)
+  );
+}
+
+function looksLikeNumberedQuestionLine(value: string) {
+  return /^\d+\s*[.)]\s+\S/iu.test(value);
 }
 
 function splitInlineAnswer(value: string): { text: string; answer?: AnswerKey } {
@@ -322,6 +537,43 @@ function isEmphasizedOptionLine(line: string) {
   return isEmphasizedLine(withoutLeadingBoldLabel);
 }
 
+function getEmphasizedAnswerFromLine(
+  line: string,
+  options: Array<{ key: AnswerKey; value: string }>,
+): AnswerKey | undefined {
+  for (const fragment of getEmphasizedTextFragments(line)) {
+    const fragmentOptions = splitInlineOptions(fragment);
+    if (fragmentOptions.options.length) {
+      return fragmentOptions.options[0].key;
+    }
+
+    const cleanFragment = normalizeWhitespace(stripInlineMarkup(fragment));
+    const matchedOption = options.find((option) => {
+      const optionValue = normalizeWhitespace(option.value);
+      return optionValue && (optionValue.includes(cleanFragment) || cleanFragment.includes(optionValue));
+    });
+    if (matchedOption) {
+      return matchedOption.key;
+    }
+  }
+
+  return undefined;
+}
+
+function getEmphasizedTextFragments(line: string) {
+  return Array.from(line.matchAll(/(?:\*\*|__)([\s\S]+?)(?:\*\*|__)|<(strong|b|mark)\b[^>]*>([\s\S]*?)<\/\2>/giu))
+    .map((match) => match[1] ?? match[3] ?? "")
+    .filter((value) => normalizeWhitespace(stripInlineMarkup(value)));
+}
+
+function isTextEmphasizedInLine(line: string, value: string) {
+  const cleanValue = normalizeWhitespace(stripInlineMarkup(value));
+  return getEmphasizedTextFragments(line).some((fragment) => {
+    const cleanFragment = normalizeWhitespace(stripInlineMarkup(fragment));
+    return cleanFragment && (cleanFragment.includes(cleanValue) || cleanValue.includes(cleanFragment));
+  });
+}
+
 function htmlToParserText(html: string) {
   const lines: string[] = [];
   const blockPattern = /<(p|h[1-6]|li)\b[^>]*>([\s\S]*?)<\/\1>/giu;
@@ -362,6 +614,37 @@ function htmlToParserText(html: string) {
   }
 
   return lines.join("\n");
+}
+
+function hasParsedOptions(options: Record<AnswerKey, string[]>) {
+  return ANSWER_KEYS.some((key) => options[key].some((value) => value.trim()));
+}
+
+function inferUnlabeledOptions(contentLines: string[]) {
+  const meaningfulLines = contentLines.filter((line) => normalizeWhitespace(stripInlineMarkup(line)));
+  if (meaningfulLines.length < ANSWER_KEYS.length + 1) {
+    return null;
+  }
+
+  const optionLines = meaningfulLines.slice(-ANSWER_KEYS.length);
+  if (!optionLines.some(isEmphasizedLine)) {
+    return null;
+  }
+
+  const inferredOptions = ANSWER_KEYS.reduce(
+    (accumulator, key, optionIndex) => ({
+      ...accumulator,
+      [key]: stripInlineMarkup(optionLines[optionIndex]),
+    }),
+    {} as Record<AnswerKey, string>,
+  );
+  const emphasizedIndex = optionLines.findIndex(isEmphasizedLine);
+
+  return {
+    contentLines: meaningfulLines.slice(0, -ANSWER_KEYS.length).map(stripInlineMarkup),
+    options: inferredOptions,
+    emphasizedAnswer: emphasizedIndex >= 0 ? ANSWER_KEYS[emphasizedIndex] : undefined,
+  };
 }
 
 async function detectColoredAnswersFromDocx(buffer: Buffer): Promise<Record<number, AnswerKey>> {
@@ -491,11 +774,15 @@ function advanceOptionCount(currentCount: number, line: string) {
 }
 
 function htmlBlockToText(value: string) {
-  return normalizeWhitespace(
-    stripInlineMarkup(value)
-      .replace(/<br\s*\/?>/giu, "\n")
-      .replace(/<[^>]+>/g, " "),
+  const withEmphasis = value.replace(
+    /<(strong|b|mark)\b[^>]*>([\s\S]*?)<\/\1>/giu,
+    (_, _tag, content) => ` **${htmlInlineToText(content)}** `,
   );
+  return normalizeWhitespace(withEmphasis.replace(/<br\s*\/?>/giu, "\n").replace(/<[^>]+>/g, " "));
+}
+
+function htmlInlineToText(value: string) {
+  return normalizeWhitespace(stripInlineMarkup(value).replace(/<[^>]+>/g, " "));
 }
 
 function isChapterHeading(value: string) {

@@ -122,6 +122,40 @@ D. Wrong
     expect(result.questions[0].errors).toHaveLength(0);
   });
 
+  it("splits adjacent unnumbered questions after complete inline options", () => {
+    const result = parseQuestionsFromText(`
+Câu 1: First question?
+**Alpha** B. Beta C. Gamma D. Delta
+Second question? One B. Two **C. Three** D. Four
+Third question?
+A. Red B. Blue C. Green **D. Black**
+`);
+
+    expect(result.totalDetected).toBe(3);
+    expect(result.questions[0].options.A).toBe("Alpha");
+    expect(result.questions[0].correctAnswer).toBe("A");
+    expect(result.questions[1].options.A).toBe("One");
+    expect(result.questions[1].correctAnswer).toBe("C");
+    expect(result.questions[2].correctAnswer).toBe("D");
+    expect(result.questions.every((question) => question.errors.length === 0)).toBe(true);
+  });
+
+  it("recovers unlabeled DOCX list options around labeled choices", () => {
+    const result = parseQuestionsFromText(`
+Câu 1: Which option is correct?
+First unlabeled option.
+Second unlabeled option.
+**Third unlabeled option.** D. Fourth labeled option.
+`);
+
+    expect(result.questions[0].options.A).toBe("First unlabeled option.");
+    expect(result.questions[0].options.B).toBe("Second unlabeled option.");
+    expect(result.questions[0].options.C).toBe("Third unlabeled option.");
+    expect(result.questions[0].options.D).toBe("Fourth labeled option.");
+    expect(result.questions[0].correctAnswer).toBe("C");
+    expect(result.questions[0].errors).toHaveLength(0);
+  });
+
   it("detects red DOCX option text as a best-effort correct answer signal", async () => {
     const zip = new JSZip();
     zip.file(
