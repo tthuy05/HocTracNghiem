@@ -47,6 +47,39 @@ Answer: A
     expect(result.questions[0].correctAnswer).toBe("A");
   });
 
+  it("splits multiple options that are on the same line", () => {
+    const result = parseQuestionsFromText(`
+Câu 1: Chọn dịch vụ lưu trữ phù hợp?
+A. File Server B. Web Server
+C. DNS Server D. DHCP Server
+Đáp án: A
+`);
+
+    expect(result.totalDetected).toBe(1);
+    expect(result.questions[0].options.A).toBe("File Server");
+    expect(result.questions[0].options.B).toBe("Web Server");
+    expect(result.questions[0].options.C).toBe("DNS Server");
+    expect(result.questions[0].options.D).toBe("DHCP Server");
+    expect(result.questions[0].correctAnswer).toBe("A");
+  });
+
+  it("keeps numbered requirement lines inside a labeled question", () => {
+    const result = parseQuestionsFromText(`
+Câu 1: Bạn cần cấp quyền nào?
+1.Cấp quyền đọc.
+2.Cấp quyền sửa.
+3.Cấp quyền xóa.
+A. 1,2 B. 2,3 C. 1,3 D. 1,2,3
+Đáp án: A
+`);
+
+    expect(result.totalDetected).toBe(1);
+    expect(result.questions[0].content).toContain("1.Cấp quyền đọc.");
+    expect(result.questions[0].options.A).toBe("1,2");
+    expect(result.questions[0].options.D).toBe("1,2,3");
+    expect(result.questions[0].errors).toHaveLength(0);
+  });
+
   it("removes inline Vietnamese answer labels from option text", () => {
     const result = parseQuestionsFromText(`
 Câu 1: File system nào hỗ trợ ACL?
