@@ -1,4 +1,5 @@
 import mammoth from "mammoth";
+import JSZip from "jszip";
 
 export const ANSWER_KEYS = ["A", "B", "C", "D"] as const;
 export type AnswerKey = (typeof ANSWER_KEYS)[number];
@@ -58,10 +59,14 @@ export async function extractDocxForParsing(arrayBuffer: ArrayBuffer): Promise<D
     mammoth.convertToHtml({ buffer }),
   ]);
   const htmlText = htmlToParserText(html.value);
+  const coloredAnswersByOrder = await detectColoredAnswersFromDocx(buffer);
 
   return {
     text: htmlText || rawText.value,
-    emphasizedAnswersByOrder: detectEmphasizedAnswersFromHtml(html.value),
+    emphasizedAnswersByOrder: {
+      ...detectEmphasizedAnswersFromHtml(html.value),
+      ...coloredAnswersByOrder,
+    },
   };
 }
 
@@ -359,6 +364,122 @@ function htmlToParserText(html: string) {
   return lines.join("\n");
 }
 
+async function detectColoredAnswersFromDocx(buffer: Buffer): Promise<Record<number, AnswerKey>> {
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml")?.async("string");
+
+  if (!documentXml) {
+    return {};
+  }
+
+  const answers: Record<number, AnswerKey> = {};
+  const paragraphs = Array.from(documentXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/giu)).map((match) => match[0]);
+  let questionIndex = -1;
+  let inQuestion = false;
+  let optionCount = 0;
+
+  for (const paragraph of paragraphs) {
+    const { text: rawText, coloredText } = readDocxParagraphText(paragraph);
+    let text = normalizeWhitespace(rawText);
+    const redText = normalizeWhitespace(coloredText);
+
+    if (!text || isChapterHeading(text)) {
+      continue;
+    }
+
+    if (labeledQuestionStartPattern.test(text) || (!inQuestion && numberedQuestionStartPattern.test(text))) {
+      questionIndex += 1;
+      inQuestion = true;
+      optionCount = 0;
+      const answerFromLine = getColoredAnswerKey(text, redText);
+      if (answerFromLine) {
+        answers[questionIndex] = answerFromLine;
+      }
+      optionCount = advanceOptionCount(optionCount, text);
+      continue;
+    }
+
+    const inlineOptionsBeforeInference = splitInlineOptions(text);
+    if (isDocxListItem(paragraph) && inQuestion && optionCount < ANSWER_KEYS.length) {
+      const expectedKey = ANSWER_KEYS[optionCount];
+      const hasInferredOptionPrefix =
+        inlineOptionsBeforeInference.options.length === 0 ||
+        (normalizeWhitespace(inlineOptionsBeforeInference.prefix) &&
+          inlineOptionsBeforeInference.options[0].key !== expectedKey);
+
+      if (hasInferredOptionPrefix) {
+        text = `${expectedKey}. ${text}`;
+      }
+    }
+
+    if (questionIndex >= 0 && redText && !answers[questionIndex]) {
+      const answerFromLine = getColoredAnswerKey(text, redText);
+      if (answerFromLine) {
+        answers[questionIndex] = answerFromLine;
+      }
+    }
+
+    optionCount = advanceOptionCount(optionCount, text);
+  }
+
+  return answers;
+}
+
+function readDocxParagraphText(paragraphXml: string) {
+  let text = "";
+  let coloredText = "";
+  const runs = Array.from(paragraphXml.matchAll(/<w:r\b[\s\S]*?<\/w:r>/giu)).map((match) => match[0]);
+
+  for (const run of runs) {
+    const runText = readDocxRunText(run);
+    text += runText;
+    if (isColoredDocxRun(run)) {
+      coloredText += runText;
+    }
+  }
+
+  return { text, coloredText };
+}
+
+function readDocxRunText(runXml: string) {
+  const textParts = Array.from(runXml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/giu)).map((match) =>
+    decodeXmlEntities(match[1]),
+  );
+  const tabCount = Array.from(runXml.matchAll(/<w:tab\b[^>]*\/>/giu)).length;
+
+  return textParts.join("") + (tabCount ? " ".repeat(tabCount) : "");
+}
+
+function isColoredDocxRun(runXml: string) {
+  return /<w:color\b[^>]*\bw:val="(?:FF0000|F00|red)"[^>]*\/?>/iu.test(runXml);
+}
+
+function isDocxListItem(paragraphXml: string) {
+  return /<w:numPr\b[\s\S]*?<\/w:numPr>/iu.test(paragraphXml);
+}
+
+function getColoredAnswerKey(line: string, coloredText: string): AnswerKey | undefined {
+  if (!coloredText) {
+    return undefined;
+  }
+
+  const coloredOptions = splitInlineOptions(coloredText);
+  if (coloredOptions.options.length) {
+    return coloredOptions.options[0].key;
+  }
+
+  const coloredValue = normalizeWhitespace(coloredText);
+  if (!coloredValue) {
+    return undefined;
+  }
+
+  const lineOptions = splitInlineOptions(line);
+  return lineOptions.options.find((option) => {
+    const optionValue = normalizeWhitespace(option.value);
+    return optionValue && (optionValue.includes(coloredValue) || coloredValue.includes(optionValue));
+  })?.key;
+}
+
 function advanceOptionCount(currentCount: number, line: string) {
   const inlineOptions = splitInlineOptions(line);
   if (!inlineOptions.options.length) {
@@ -397,6 +518,18 @@ function stripInlineMarkup(value: string) {
   return value
     .replace(/<\/?(strong|b|mark|span|em|i)[^>]*>/giu, "")
     .replace(/(?:\*\*|__|`+)/g, "")
+    .replace(/&nbsp;/giu, " ")
+    .replace(/&amp;/giu, "&")
+    .replace(/&quot;/giu, '"')
+    .replace(/&#39;/giu, "'")
+    .replace(/&#(\d+);/gu, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/giu, (_, code) => String.fromCharCode(Number.parseInt(code, 16)))
+    .replace(/&lt;/giu, "<")
+    .replace(/&gt;/giu, ">");
+}
+
+function decodeXmlEntities(value: string) {
+  return value
     .replace(/&nbsp;/giu, " ")
     .replace(/&amp;/giu, "&")
     .replace(/&quot;/giu, '"')

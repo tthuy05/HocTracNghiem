@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseQuestionsFromText } from "@/lib/parser";
+import JSZip from "jszip";
+import { extractDocxForParsing, parseQuestionsFromText } from "@/lib/parser";
 
 describe("parseQuestionsFromText", () => {
   it("detects Vietnamese question and A/B/C/D options", () => {
@@ -117,6 +118,51 @@ C. Wrong
 D. Wrong
 `);
 
+    expect(result.questions[0].correctAnswer).toBe("B");
+    expect(result.questions[0].errors).toHaveLength(0);
+  });
+
+  it("detects red DOCX option text as a best-effort correct answer signal", async () => {
+    const zip = new JSZip();
+    zip.file(
+      "[Content_Types].xml",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`,
+    );
+    zip.folder("_rels")?.file(
+      ".rels",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`,
+    );
+    zip.folder("word")?.file(
+      "document.xml",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Cau 1: Pick the red answer</w:t></w:r></w:p>
+    <w:p><w:r><w:t>A. Alpha</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>B. Beta</w:t></w:r></w:p>
+    <w:p><w:r><w:t>C. Gamma</w:t></w:r></w:p>
+    <w:p><w:r><w:t>D. Delta</w:t></w:r></w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>`,
+    );
+
+    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    const extracted = await extractDocxForParsing(arrayBuffer);
+    const result = parseQuestionsFromText(extracted.text, {
+      emphasizedAnswersByOrder: extracted.emphasizedAnswersByOrder,
+    });
+
+    expect(extracted.emphasizedAnswersByOrder[0]).toBe("B");
     expect(result.questions[0].correctAnswer).toBe("B");
     expect(result.questions[0].errors).toHaveLength(0);
   });
