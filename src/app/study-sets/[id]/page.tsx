@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Play, Trash2 } from "lucide-react";
 import { deleteStudySetAction, startStudySessionAction } from "@/app/actions";
+import { QuestionContent } from "@/components/study/question-content";
 import { RenameStudySetForm } from "@/components/study-set/rename-study-set-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ export default async function StudySetDetailPage({ params }: { params: Promise<{
           </div>
           <div className="grid gap-4">
             {studySet.questions.map((question) => (
-              <Card key={question.id}>
+              <Card key={question.id} className="min-w-0">
                 <CardHeader>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <CardTitle className="text-base">
@@ -72,14 +73,19 @@ export default async function StudySetDetailPage({ params }: { params: Promise<{
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-base font-medium leading-7">{question.content}</p>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {(["A", "B", "C", "D"] as const).map((key) => (
+                  <QuestionContent
+                    content={question.content}
+                    table={question.table}
+                    questionText={question.questionText}
+                    statements={question.statements}
+                  />
+                  <div className="question-options question-options-compact">
+                    {question.options.map((option) => (
                       <div
-                        key={key}
+                        key={option.label}
                         className="rounded-md border bg-background px-3 py-2 text-sm leading-6"
                       >
-                        <span className="font-semibold">{key}.</span> {question.options[key]}
+                        <span className="font-semibold">{option.label}.</span> {option.text}
                       </div>
                     ))}
                   </div>

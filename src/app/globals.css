@@ -44,3 +44,61 @@ textarea,
 select {
   -webkit-tap-highlight-color: transparent;
 }
+
+@layer components {
+  .question-content {
+    @apply min-w-0 space-y-4 text-base leading-7;
+    overflow-wrap: anywhere;
+  }
+
+  .question-content p {
+    @apply whitespace-pre-wrap;
+  }
+
+  .question-prompt {
+    @apply font-semibold text-foreground;
+  }
+
+  .question-statements {
+    @apply list-decimal space-y-2 pl-6;
+  }
+
+  .question-statements li {
+    @apply pl-1;
+  }
+
+  .question-table-scroll {
+    @apply w-full min-w-0 max-w-full overflow-x-auto rounded-md border;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .question-table {
+    @apply w-full min-w-[36rem] border-collapse bg-background text-left text-sm leading-6;
+  }
+
+  .question-table th,
+  .question-table td {
+    @apply border-b border-r px-3 py-2 align-top last:border-r-0;
+  }
+
+  .question-table th {
+    @apply bg-muted font-semibold;
+  }
+
+  .question-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .question-options {
+    @apply grid gap-3;
+  }
+
+  .question-options > * {
+    @apply min-w-0;
+    overflow-wrap: anywhere;
+  }
+
+  .question-options-compact {
+    @apply gap-2 md:grid-cols-2;
+  }
+}

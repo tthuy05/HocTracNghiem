@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
-import { extractDocxForParsing, parseQuestionsFromText } from "@/lib/parser";
+import {
+  extractDocxForParsing,
+  parseQuestionContent,
+  parseQuestionsFromText,
+} from "@/lib/parser";
 
 describe("parseQuestionsFromText", () => {
   it("detects Vietnamese question and A/B/C/D options", () => {
@@ -79,6 +83,21 @@ A. 1,2 B. 2,3 C. 1,3 D. 1,2,3
     expect(result.questions[0].options.A).toBe("1,2");
     expect(result.questions[0].options.D).toBe("1,2,3");
     expect(result.questions[0].errors).toHaveLength(0);
+  });
+
+  it("preserves source line breaks instead of flattening question content", () => {
+    const result = parseQuestionsFromText(`
+Cau 1: Tinh huong ban dau.
+Day la doan mo ta rieng.
+1. Menh de thu nhat.
+2. Menh de thu hai.
+A. Mot B. Hai C. Ba D. Bon
+Answer: A
+`);
+
+    expect(result.questions[0].content).toBe(
+      "Tinh huong ban dau.\nDay la doan mo ta rieng.\n1. Menh de thu nhat.\n2. Menh de thu hai.",
+    );
   });
 
   it("removes inline Vietnamese answer labels from option text", () => {
@@ -190,7 +209,7 @@ Second unlabeled option.
     );
 
     const buffer = await zip.generateAsync({ type: "nodebuffer" });
-    const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    const arrayBuffer = Uint8Array.from(buffer).buffer;
     const extracted = await extractDocxForParsing(arrayBuffer);
     const result = parseQuestionsFromText(extracted.text, {
       emphasizedAnswersByOrder: extracted.emphasizedAnswersByOrder,
@@ -199,5 +218,73 @@ Second unlabeled option.
     expect(extracted.emphasizedAnswersByOrder[0]).toBe("B");
     expect(result.questions[0].correctAnswer).toBe("B");
     expect(result.questions[0].errors).toHaveLength(0);
+  });
+});
+
+describe("parseQuestionContent", () => {
+  it("extracts a flattened permissions table and numbered statements", () => {
+    const content = parseQuestionContent(
+      "Bạn đang cấu hình thư mục dùng chung. " +
+        "Nhóm/Người dùng Quyền bảo mật NTFS Quyền Chia sẻ (Share) " +
+        "Sales Read Change Marketing Modify Change R&D Deny Full Control " +
+        "Bạn cần làm gì để cấp quyền phù hợp? " +
+        "1. Cấp quyền cho Sales. 2. Cấp quyền cho Marketing. 3. Giữ quyền R&D. 4. Cấp quyền cho Admin. 5. Kiểm tra truy cập.",
+    );
+
+    expect(content.content).toBe("Bạn đang cấu hình thư mục dùng chung.");
+    expect(content.table).toEqual({
+      headers: ["Nhóm/Người dùng", "Quyền bảo mật NTFS", "Quyền Chia sẻ (Share)"],
+      rows: [
+        ["Sales", "Read", "Change"],
+        ["Marketing", "Modify", "Change"],
+        ["R&D", "Deny", "Full Control"],
+      ],
+    });
+    expect(content.questionText).toBe("Bạn cần làm gì để cấp quyền phù hợp?");
+    expect(content.statements).toEqual([
+      "Cấp quyền cho Sales.",
+      "Cấp quyền cho Marketing.",
+      "Giữ quyền R&D.",
+      "Cấp quyền cho Admin.",
+      "Kiểm tra truy cập.",
+    ]);
+  });
+
+  it("extracts numbered statements without mistaking IP addresses for list markers", () => {
+    const content = parseQuestionContent(
+      "Máy chủ có địa chỉ 10.1.1.1. Bạn cần chọn các bước nào? 1.Kiểm tra DNS 2.Kiểm tra TCP/IP 3.Khởi động lại",
+    );
+
+    expect(content.content).toBe("Máy chủ có địa chỉ 10.1.1.1.");
+    expect(content.questionText).toBe("Bạn cần chọn các bước nào?");
+    expect(content.statements).toEqual(["Kiểm tra DNS", "Kiểm tra TCP/IP", "Khởi động lại"]);
+  });
+
+  it("supports the compact table header form", () => {
+    const content = parseQuestionContent(
+      "Tình huống. Nhóm/Người dùng NTFS Chia sẻ Sales Read Change Finance Modify Read",
+    );
+
+    expect(content.table?.headers).toEqual(["Nhóm/Người dùng", "NTFS", "Chia sẻ"]);
+    expect(content.table?.rows).toEqual([
+      ["Sales", "Read", "Change"],
+      ["Finance", "Modify", "Read"],
+    ]);
+  });
+
+  it("supports generic tables preserved from DOCX cell boundaries", () => {
+    const content = parseQuestionContent(
+      "Dữ liệu khảo sát:\nKhu vực\tMáy chủ\tTrạng thái\nHà Nội\tSRV-01\tOnline\nĐà Nẵng\tSRV-02\tOffline\nMáy chủ nào cần kiểm tra?",
+    );
+
+    expect(content.content).toBe("Dữ liệu khảo sát:");
+    expect(content.table).toEqual({
+      headers: ["Khu vực", "Máy chủ", "Trạng thái"],
+      rows: [
+        ["Hà Nội", "SRV-01", "Online"],
+        ["Đà Nẵng", "SRV-02", "Offline"],
+      ],
+    });
+    expect(content.questionText).toBe("Máy chủ nào cần kiểm tra?");
   });
 });

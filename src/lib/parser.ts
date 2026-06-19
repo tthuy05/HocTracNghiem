@@ -4,6 +4,23 @@ import JSZip from "jszip";
 export const ANSWER_KEYS = ["A", "B", "C", "D"] as const;
 export type AnswerKey = (typeof ANSWER_KEYS)[number];
 
+export type QuestionTable = {
+  headers: string[];
+  rows: string[][];
+};
+
+export type QuestionOption = {
+  label: AnswerKey;
+  text: string;
+};
+
+export type QuestionContent = {
+  content: string;
+  table?: QuestionTable;
+  questionText?: string;
+  statements?: string[];
+};
+
 export type ParsedQuestion = {
   id: string;
   orderIndex: number;
@@ -37,6 +54,20 @@ const qualifiedAnswerPattern = /^(?:đáp\s*án\s*đúng|dap\s*an\s*dung)\s*[:\-
 const inlineAnswerPattern =
   /(?:^|\s)(?:đáp\s*án(?:\s*đúng)?|dap\s*an(?:\s*dung)?|answer|correct(?:\s+answer)?)\s*[:\-]\s*([A-D])\b.*$/iu;
 
+const tableHeaderPattern =
+  /(?<group>Nhóm\s*\/\s*Người\s+dùng)\s+(?<ntfs>(?:Quyền\s+bảo\s+mật\s+)?NTFS)\s+(?<share>(?:Quyền\s+)?Chia\s+sẻ(?:\s*\(Share\))?)/iu;
+const asciiTableHeaderPattern =
+  /(?<group>Nhom\s*\/\s*Nguoi\s+dung|Group\s*\/\s*User)\s+(?<ntfs>(?:Quyen\s+bao\s+mat\s+)?NTFS)\s+(?<share>(?:Quyen\s+)?Chia\s+se(?:\s*\(Share\))?|Share)/iu;
+const permissionPattern =
+  "Full\\s+Control|Read\\s*&\\s*Execute|List\\s+Folder\\s+Contents|No\\s+Access|Modify|Change|Read|Write|Deny|Allow";
+const tableRowPattern = new RegExp(
+  `^(?<name>[^.!?\\n]{1,80}?)\\s+(?<ntfs>${permissionPattern})\\s+(?<share>${permissionPattern})(?=\\s|$)`,
+  "iu",
+);
+const numberedStatementPattern = /(?:^|\s)(\d{1,2})\.(?!\d)\s*/gu;
+const trailingQuestionPattern =
+  /^(?<statement>[\s\S]*?[.!?])\s+(?<question>(?:Bạn|Anh|Chị|Hành động|Lựa chọn|Phương án|Những|Các|Điều gì|Câu nào)[\s\S]*\?)$/iu;
+
 export function parseQuestionsFromText(input: string, options: ParseOptions = {}): ParseResult {
   const normalized = normalizeText(input);
   const blocks = splitQuestionBlocks(normalized);
@@ -50,6 +81,41 @@ export function parseQuestionsFromText(input: string, options: ParseOptions = {}
     missingAnswerCount: questions.filter((question) => !question.correctAnswer).length,
     questions,
   };
+}
+
+export function parseQuestionContent(input: string): QuestionContent {
+  const normalized = normalizeStructuredText(stripInlineMarkup(input));
+  const tableExtraction = extractQuestionTable(normalized);
+
+  if (tableExtraction.table) {
+    const beforeTable = splitContentAndQuestionText(tableExtraction.before);
+    const afterTableStatements = extractNumberedStatements(tableExtraction.after);
+    const afterTable = splitContentAndQuestionText(afterTableStatements.before);
+
+    return compactQuestionContent({
+      content: beforeTable.content,
+      table: tableExtraction.table,
+      questionText: joinStructuredText(
+        beforeTable.questionText,
+        afterTable.content,
+        afterTable.questionText,
+        afterTableStatements.after,
+      ),
+      statements: afterTableStatements.statements,
+    });
+  }
+
+  const statementExtraction = extractNumberedStatements(normalized);
+  const beforeStatements = splitContentAndQuestionText(statementExtraction.before);
+
+  return compactQuestionContent({
+    content: beforeStatements.content,
+    questionText: joinStructuredText(
+      beforeStatements.questionText,
+      statementExtraction.after,
+    ),
+    statements: statementExtraction.statements,
+  });
 }
 
 export async function extractDocxForParsing(arrayBuffer: ArrayBuffer): Promise<DocxExtraction> {
@@ -183,7 +249,7 @@ function parseQuestionBlock(lines: string[], index: number, emphasizedAnswer?: A
   const parsed: ParsedQuestion = {
     id: `parsed-${index + 1}`,
     orderIndex: index,
-    content: normalizeWhitespace(contentLines.map(stripInlineMarkup).join(" ")),
+    content: normalizeContentLines(contentLines),
     options: normalizedOptions,
     correctAnswer,
     errors: [],
@@ -576,12 +642,18 @@ function isTextEmphasizedInLine(line: string, value: string) {
 
 function htmlToParserText(html: string) {
   const lines: string[] = [];
-  const blockPattern = /<(p|h[1-6]|li)\b[^>]*>([\s\S]*?)<\/\1>/giu;
+  const blockPattern = /<(table|p|h[1-6]|li)\b[^>]*>([\s\S]*?)<\/\1>/giu;
   let inQuestion = false;
   let optionCount = 0;
 
   for (const match of html.matchAll(blockPattern)) {
     const tag = match[1].toLowerCase();
+
+    if (tag === "table") {
+      lines.push(...htmlTableToParserLines(match[2]));
+      continue;
+    }
+
     let text = htmlBlockToText(match[2]);
 
     if (!text || isChapterHeading(text)) {
@@ -781,6 +853,17 @@ function htmlBlockToText(value: string) {
   return normalizeWhitespace(withEmphasis.replace(/<br\s*\/?>/giu, "\n").replace(/<[^>]+>/g, " "));
 }
 
+function htmlTableToParserLines(value: string) {
+  return Array.from(value.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/giu))
+    .map((rowMatch) =>
+      Array.from(rowMatch[1].matchAll(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/giu))
+        .map((cellMatch) => htmlBlockToText(cellMatch[1]))
+        .filter(Boolean)
+        .join("\t"),
+    )
+    .filter(Boolean);
+}
+
 function htmlInlineToText(value: string) {
   return normalizeWhitespace(stripInlineMarkup(value).replace(/<[^>]+>/g, " "));
 }
@@ -799,6 +882,226 @@ function normalizeText(value: string) {
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function normalizeContentLines(lines: string[]) {
+  return lines
+    .map((line) =>
+      line
+        .split("\t")
+        .map((part) => normalizeWhitespace(stripInlineMarkup(part)))
+        .join("\t"),
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+function normalizeStructuredText(value: string) {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) =>
+      line
+        .split("\t")
+        .map(normalizeWhitespace)
+        .join("\t"),
+    )
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function extractQuestionTable(value: string): {
+  before: string;
+  table?: QuestionTable;
+  after: string;
+} {
+  const delimitedTable = extractDelimitedQuestionTable(value);
+  if (delimitedTable.table) {
+    return delimitedTable;
+  }
+
+  const headerMatch = tableHeaderPattern.exec(value) ?? asciiTableHeaderPattern.exec(value);
+  if (!headerMatch?.groups || headerMatch.index === undefined) {
+    return { before: value, after: "" };
+  }
+
+  const headers = [
+    normalizeWhitespace(headerMatch.groups.group),
+    normalizeWhitespace(headerMatch.groups.ntfs),
+    normalizeWhitespace(headerMatch.groups.share),
+  ];
+  const before = normalizeStructuredText(value.slice(0, headerMatch.index));
+  let remaining = value.slice(headerMatch.index + headerMatch[0].length);
+  const rows: string[][] = [];
+
+  while (remaining.trimStart()) {
+    const candidate = remaining.trimStart();
+    const rowMatch = tableRowPattern.exec(candidate);
+    if (!rowMatch?.groups) {
+      break;
+    }
+
+    rows.push([
+      normalizeWhitespace(rowMatch.groups.name),
+      normalizeWhitespace(rowMatch.groups.ntfs),
+      normalizeWhitespace(rowMatch.groups.share),
+    ]);
+    remaining = candidate.slice(rowMatch[0].length);
+  }
+
+  if (!rows.length) {
+    return { before: value, after: "" };
+  }
+
+  return {
+    before,
+    table: { headers, rows },
+    after: normalizeStructuredText(remaining),
+  };
+}
+
+function extractDelimitedQuestionTable(value: string): {
+  before: string;
+  table?: QuestionTable;
+  after: string;
+} {
+  const lines = value.split("\n");
+
+  for (let startIndex = 0; startIndex < lines.length; startIndex += 1) {
+    const headers = splitDelimitedTableRow(lines[startIndex]);
+    if (headers.length < 2) {
+      continue;
+    }
+
+    const rows: string[][] = [];
+    let endIndex = startIndex + 1;
+    while (endIndex < lines.length) {
+      const row = splitDelimitedTableRow(lines[endIndex]);
+      if (row.length !== headers.length) {
+        break;
+      }
+
+      rows.push(row);
+      endIndex += 1;
+    }
+
+    if (!rows.length) {
+      continue;
+    }
+
+    return {
+      before: normalizeStructuredText(lines.slice(0, startIndex).join("\n")),
+      table: { headers, rows },
+      after: normalizeStructuredText(lines.slice(endIndex).join("\n")),
+    };
+  }
+
+  return { before: value, after: "" };
+}
+
+function splitDelimitedTableRow(value: string) {
+  return value
+    .split("\t")
+    .map(normalizeWhitespace)
+    .filter(Boolean);
+}
+
+function extractNumberedStatements(value: string): {
+  before: string;
+  statements?: string[];
+  after: string;
+} {
+  const markers = Array.from(value.matchAll(numberedStatementPattern)).map((match) => {
+    const numberText = match[1];
+    const markerOffset = match[0].lastIndexOf(numberText);
+
+    return {
+      number: Number(numberText),
+      markerStart: (match.index ?? 0) + markerOffset,
+      valueStart: (match.index ?? 0) + match[0].length,
+    };
+  });
+
+  let bestRun: typeof markers = [];
+  for (let startIndex = 0; startIndex < markers.length; startIndex += 1) {
+    if (markers[startIndex].number !== 1) {
+      continue;
+    }
+
+    const run = [markers[startIndex]];
+    let expectedNumber = 2;
+    for (let markerIndex = startIndex + 1; markerIndex < markers.length; markerIndex += 1) {
+      if (markers[markerIndex].number !== expectedNumber) {
+        break;
+      }
+
+      run.push(markers[markerIndex]);
+      expectedNumber += 1;
+    }
+
+    if (run.length >= 2 && run.length > bestRun.length) {
+      bestRun = run;
+    }
+  }
+
+  if (!bestRun.length) {
+    return { before: value, after: "" };
+  }
+
+  const statements = bestRun.map((marker, index) => {
+    const nextMarker = bestRun[index + 1];
+    return normalizeStructuredText(value.slice(marker.valueStart, nextMarker?.markerStart ?? value.length));
+  });
+  let after = "";
+  const lastStatement = statements.at(-1);
+  const trailingQuestion = lastStatement?.match(trailingQuestionPattern);
+
+  if (trailingQuestion?.groups) {
+    statements[statements.length - 1] = normalizeStructuredText(trailingQuestion.groups.statement);
+    after = normalizeStructuredText(trailingQuestion.groups.question);
+  }
+
+  return {
+    before: normalizeStructuredText(value.slice(0, bestRun[0].markerStart)),
+    statements,
+    after,
+  };
+}
+
+function splitContentAndQuestionText(value: string): {
+  content: string;
+  questionText?: string;
+} {
+  const normalized = normalizeStructuredText(value);
+  const questionEnd = normalized.lastIndexOf("?");
+  if (questionEnd < 0) {
+    return { content: normalized };
+  }
+
+  const sentenceBoundaryPattern = /[.!?]\s+/gu;
+  let questionStart = 0;
+  for (const match of normalized.slice(0, questionEnd).matchAll(sentenceBoundaryPattern)) {
+    questionStart = (match.index ?? 0) + match[0].length;
+  }
+
+  return {
+    content: normalizeStructuredText(normalized.slice(0, questionStart)),
+    questionText: normalizeStructuredText(normalized.slice(questionStart)),
+  };
+}
+
+function joinStructuredText(...values: Array<string | undefined>) {
+  return values.filter((value): value is string => Boolean(value?.trim())).join("\n");
+}
+
+function compactQuestionContent(content: QuestionContent): QuestionContent {
+  return {
+    content: content.content,
+    ...(content.table ? { table: content.table } : {}),
+    ...(content.questionText ? { questionText: content.questionText } : {}),
+    ...(content.statements?.length ? { statements: content.statements } : {}),
+  };
 }
 
 function stripInlineMarkup(value: string) {

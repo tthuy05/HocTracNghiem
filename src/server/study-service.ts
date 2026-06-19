@@ -1,5 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { ANSWER_KEYS, type AnswerKey } from "@/lib/parser";
+import {
+  ANSWER_KEYS,
+  parseQuestionContent,
+  type AnswerKey,
+  type QuestionOption,
+  type QuestionTable,
+} from "@/lib/parser";
 import {
   createInitialSessionState,
   resetSessionState,
@@ -21,7 +27,10 @@ export type QuestionView = {
   id: string;
   orderIndex: number;
   content: string;
-  options: Record<AnswerKey, string>;
+  table?: QuestionTable;
+  questionText?: string;
+  statements?: string[];
+  options: QuestionOption[];
   correctAnswer: AnswerKey;
   explanation: string | null;
 };
@@ -304,16 +313,16 @@ function mapQuestionView(question: {
   correctAnswer: string;
   explanation: string | null;
 }): QuestionView {
+  const structuredContent = parseQuestionContent(question.content);
+
   return {
     id: question.id,
     orderIndex: question.orderIndex,
-    content: question.content,
-    options: {
-      A: question.optionA,
-      B: question.optionB,
-      C: question.optionC,
-      D: question.optionD,
-    },
+    ...structuredContent,
+    options: ANSWER_KEYS.map((label) => ({
+      label,
+      text: question[`option${label}`],
+    })),
     correctAnswer: parseAnswerKey(question.correctAnswer),
     explanation: question.explanation,
   };

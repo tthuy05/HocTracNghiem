@@ -12,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { resetStudySessionAction, submitAnswerAction } from "@/app/actions";
+import { QuestionContent } from "@/components/study/question-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,8 +20,6 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import type { AnswerKey } from "@/lib/parser";
 import type { StudySessionView, SubmitAnswerResult } from "@/server/study-service";
-
-const answerKeys: AnswerKey[] = ["A", "B", "C", "D"];
 
 export function StudySessionClient({ initialSession }: { initialSession: StudySessionView }) {
   const [session, setSession] = useState(initialSession);
@@ -192,13 +191,19 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
         </div>
 
         {question ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg leading-7">{question.content}</CardTitle>
+          <Card className="min-w-0">
+            <CardHeader className="pb-3">
+              <QuestionContent
+                content={question.content}
+                table={question.table}
+                questionText={question.questionText}
+                statements={question.statements}
+              />
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3">
-                {answerKeys.map((key) => {
+              <div className="question-options">
+                {question.options.map((option) => {
+                  const key = option.label;
                   const isCorrectAnswer = answerResult?.answer.correctAnswer === key;
                   const isSelectedWrong =
                     answerResult?.answer.selectedAnswer === key && !answerResult.answer.isCorrect;
@@ -225,12 +230,10 @@ export function StudySessionClient({ initialSession }: { initialSession: StudySe
                         <XCircle className="h-5 w-5 shrink-0" />
                       ) : (
                         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-secondary font-bold">
-                          {key}
+                          {key}.
                         </span>
                       )}
-                      <span>
-                        <span className="font-bold">{key}.</span> {question.options[key]}
-                      </span>
+                      <span>{option.text}</span>
                     </Button>
                   );
                 })}
