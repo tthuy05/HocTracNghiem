@@ -1,9 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { CreateStudySetClient } from "@/components/study-set/create-study-set-client";
 import { Button } from "@/components/ui/button";
+import { getIsAdmin } from "@/lib/admin-auth";
 
-export default function NewStudySetPage() {
+export default async function NewStudySetPage() {
+  if (!(await getIsAdmin())) {
+    redirect(`/admin-login?from=${encodeURIComponent("/study-sets/new")}`);
+  }
+
   return (
     <main className="min-h-screen">
       <div className="container space-y-7 py-8 sm:py-10">

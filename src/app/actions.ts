@@ -22,6 +22,13 @@ import {
   type StudySessionView,
   type SubmitAnswerResult,
 } from "@/server/study-service";
+import {
+  clearAdminSession,
+  createAdminSession,
+  getSafeRedirectPath,
+  isAdminCredential,
+  requireAdmin,
+} from "@/lib/admin-auth";
 
 type ActionResult<T> = {
   ok: boolean;
@@ -50,6 +57,8 @@ const createStudySetSchema = z.object({
 });
 
 export async function parseImportedContentAction(formData: FormData): Promise<ActionResult<ParseResult & { sourceFileName?: string }>> {
+  await requireAdmin();
+
   try {
     const manualText = String(formData.get("text") ?? "");
     const maybeFile = formData.get("file");
@@ -90,6 +99,8 @@ export async function parseImportedContentAction(formData: FormData): Promise<Ac
 }
 
 export async function createStudySetAction(input: CreateStudySetInput): Promise<ActionResult<{ id: string }>> {
+  await requireAdmin();
+
   const parsed = createStudySetSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -111,6 +122,8 @@ export async function createStudySetAction(input: CreateStudySetInput): Promise<
 }
 
 export async function deleteStudySetAction(studySetId: string, shouldRedirect: boolean) {
+  await requireAdmin();
+
   await deleteStudySet(studySetId);
   revalidatePath("/");
   if (shouldRedirect) {
@@ -119,6 +132,8 @@ export async function deleteStudySetAction(studySetId: string, shouldRedirect: b
 }
 
 export async function updateStudySetTitleAction(studySetId: string, formData: FormData) {
+  await requireAdmin();
+
   const title = String(formData.get("title") ?? "").trim();
   if (!title) {
     return;
@@ -127,6 +142,27 @@ export async function updateStudySetTitleAction(studySetId: string, formData: Fo
   await updateStudySetTitle(studySetId, title);
   revalidatePath(`/study-sets/${studySetId}`);
   revalidatePath("/");
+}
+
+export async function loginAdminAction(formData: FormData) {
+  const username = String(formData.get("username") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const redirectTo = getSafeRedirectPath(formData.get("redirectTo"));
+
+  if (!isAdminCredential(username, password)) {
+    redirect(`/admin-login?error=1&from=${encodeURIComponent(redirectTo)}`);
+  }
+
+  await createAdminSession();
+  revalidatePath("/");
+  revalidatePath(redirectTo);
+  redirect(redirectTo);
+}
+
+export async function logoutAdminAction() {
+  await clearAdminSession();
+  revalidatePath("/");
+  redirect("/");
 }
 
 export async function startStudySessionAction(studySetId: string) {

@@ -4,6 +4,12 @@ test("creates a study set, reviews a wrong answer, and completes the session", a
   const title = `Bộ đề E2E ${Date.now()}`;
 
   await page.goto("/study-sets/new");
+  await expect(page).toHaveURL(/\/admin-login/);
+  await page.getByLabel("Tài khoản").fill("tthuy005");
+  await page.getByLabel("Mật khẩu").fill("1162005thuy");
+  await page.getByRole("button", { name: "Đăng nhập" }).click();
+  await expect(page).toHaveURL(/\/study-sets\/new$/);
+
   await page.getByLabel("Tên bộ đề").fill(title);
   await page.getByLabel("Dán nội dung đề").fill(`
 Cau 1: Thu do Viet Nam la gi?

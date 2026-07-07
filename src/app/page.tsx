@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { BookOpenCheck, CalendarDays, Eye, FilePlus2, Play, Plus, Trash2 } from "lucide-react";
-import { deleteStudySetAction, startStudySessionAction } from "@/app/actions";
+import { BookOpenCheck, CalendarDays, Eye, FilePlus2, LogIn, LogOut, Play, Plus, Trash2 } from "lucide-react";
+import { deleteStudySetAction, logoutAdminAction, startStudySessionAction } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { getStudySets } from "@/server/study-service";
+import { getIsAdmin } from "@/lib/admin-auth";
 import { formatDate } from "@/lib/utils";
 
 export default async function HomePage() {
   const studySets = await getStudySets();
+  const isAdmin = await getIsAdmin();
 
   return (
     <main className="min-h-screen">
@@ -25,12 +27,31 @@ export default async function HomePage() {
               Nhập đề trắc nghiệm, luyện từng câu và ôn lại các câu sai cho đến khi nắm chắc.
             </p>
           </div>
-          <Button asChild size="lg">
-            <Link href="/study-sets/new">
-              <Plus className="h-5 w-5" />
-              Tạo Bộ Đề Mới
-            </Link>
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {isAdmin ? (
+              <>
+                <Button asChild size="lg">
+                  <Link href="/study-sets/new">
+                    <Plus className="h-5 w-5" />
+                    Tạo Bộ Đề Mới
+                  </Link>
+                </Button>
+                <form action={logoutAdminAction}>
+                  <Button type="submit" size="lg" variant="outline" className="w-full sm:w-auto">
+                    <LogOut className="h-5 w-5" />
+                    Đăng xuất
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <Button asChild size="lg" variant="outline">
+                <Link href="/admin-login">
+                  <LogIn className="h-5 w-5" />
+                  Đăng nhập quản trị
+                </Link>
+              </Button>
+            )}
+          </div>
         </header>
 
         <section className="space-y-4">
@@ -51,15 +72,19 @@ export default async function HomePage() {
                 <div className="max-w-md space-y-2">
                   <h3 className="text-lg font-semibold">Chưa có bộ đề nào</h3>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Tạo bộ đề đầu tiên bằng cách dán nội dung hoặc tải lên tệp .docx.
+                    {isAdmin
+                      ? "Tạo bộ đề đầu tiên bằng cách dán nội dung hoặc tải lên tệp .docx."
+                      : "Hiện chưa có bộ đề nào để xem và luyện tập."}
                   </p>
                 </div>
-                <Button asChild>
-                  <Link href="/study-sets/new">
-                    <Plus className="h-4 w-4" />
-                    Tạo Bộ Đề Mới
-                  </Link>
-                </Button>
+                {isAdmin ? (
+                  <Button asChild>
+                    <Link href="/study-sets/new">
+                      <Plus className="h-4 w-4" />
+                      Tạo Bộ Đề Mới
+                    </Link>
+                  </Button>
+                ) : null}
               </CardContent>
             </Card>
           ) : (
@@ -94,12 +119,14 @@ export default async function HomePage() {
                         Xem Chi Tiết
                       </Link>
                     </Button>
-                    <form action={deleteStudySetAction.bind(null, studySet.id, false)}>
-                      <Button type="submit" variant="destructive" className="w-full sm:w-auto">
-                        <Trash2 className="h-4 w-4" />
-                        Xóa
-                      </Button>
-                    </form>
+                    {isAdmin ? (
+                      <form action={deleteStudySetAction.bind(null, studySet.id, false)}>
+                        <Button type="submit" variant="destructive" className="w-full sm:w-auto">
+                          <Trash2 className="h-4 w-4" />
+                          Xóa
+                        </Button>
+                      </form>
+                    ) : null}
                   </CardFooter>
                 </Card>
               ))}

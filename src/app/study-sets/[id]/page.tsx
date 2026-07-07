@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Play, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, LogIn, Play, Trash2 } from "lucide-react";
 import { deleteStudySetAction, startStudySessionAction } from "@/app/actions";
 import { QuestionContent } from "@/components/study/question-content";
 import { RenameStudySetForm } from "@/components/study-set/rename-study-set-form";
@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getStudySetDetail } from "@/server/study-service";
+import { getIsAdmin } from "@/lib/admin-auth";
 import { formatDate } from "@/lib/utils";
 
 export default async function StudySetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const studySet = await getStudySetDetail(id);
+  const isAdmin = await getIsAdmin();
 
   if (!studySet) {
     notFound();
@@ -42,13 +44,24 @@ export default async function StudySetDetailPage({ params }: { params: Promise<{
                   Bắt Đầu Học
                 </Button>
               </form>
-              <RenameStudySetForm studySetId={studySet.id} currentTitle={studySet.title} />
-              <form action={deleteStudySetAction.bind(null, studySet.id, true)}>
-                <Button type="submit" variant="destructive">
-                  <Trash2 className="h-4 w-4" />
-                  Xóa Bộ Đề
+              {isAdmin ? (
+                <>
+                  <RenameStudySetForm studySetId={studySet.id} currentTitle={studySet.title} />
+                  <form action={deleteStudySetAction.bind(null, studySet.id, true)}>
+                    <Button type="submit" variant="destructive">
+                      <Trash2 className="h-4 w-4" />
+                      Xóa Bộ Đề
+                    </Button>
+                  </form>
+                </>
+              ) : (
+                <Button asChild variant="outline">
+                  <Link href={`/admin-login?from=${encodeURIComponent(`/study-sets/${studySet.id}`)}`}>
+                    <LogIn className="h-4 w-4" />
+                    Đăng nhập quản trị
+                  </Link>
                 </Button>
-              </form>
+              )}
             </div>
           </div>
         </header>
